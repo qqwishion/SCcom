@@ -85,6 +85,9 @@ class Engine:
                     capture_start = time.perf_counter()
                     frame = capture.grab()
                     captured = time.perf_counter()
+                    if frame is None:
+                        self.stop_event.wait(1 / self.config.capture_hz)
+                        continue
                     # MSS can wait for a desktop refresh. The returned image arrives
                     # at the end of that wait; its duration is not added as frame age.
                     timestamp = captured
@@ -139,10 +142,14 @@ class Engine:
                         if decision.fire and not self.stop_event.is_set():
                             actual = time.perf_counter()
                             # Reject a decision that became stale before dispatch.
+                            hit_region = (
+                                predictor.target.gray_region()
+                                if decision.zone == "gray"
+                                else predictor.target
+                            )
                             safe_lateness = max(
                                 0.001,
-                                predictor.target.overlap_half_width(observation.pointer_width)
-                                / speed
+                                hit_region.overlap_half_width(observation.pointer_width) / speed
                                 + min(0.0, decision.eta_ms / 1000),
                             )
                             if actual - now > safe_lateness:
@@ -159,7 +166,7 @@ class Engine:
                                 last_sent_time = actual
                                 predictor.mark_fired()
                                 log.info(
-                                    "Space: speed=%.3f eta_ms=%.2f dispatch_ms=%.2f frame_ms=%.2f capture_ms=%.2f send_ms=%.3f needle_width=%.4f",
+                                    "Space: speed=%.3f eta_ms=%.2f dispatch_ms=%.2f frame_ms=%.2f capture_ms=%.2f send_ms=%.3f needle_width=%.4f zone=%s backend=%s",
                                     speed,
                                     decision.eta_ms,
                                     (actual - now) * 1000,
@@ -167,6 +174,8 @@ class Engine:
                                     (captured - capture_start) * 1000,
                                     sent,
                                     observation.pointer_width,
+                                    decision.zone,
+                                    capture.name,
                                 )
                         if not capture.locked:
                             old_region = capture.region

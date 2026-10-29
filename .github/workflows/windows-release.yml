@@ -55,7 +55,8 @@ jobs:
           }
           @(
             "Windows x64. Python is included; run VDchecker.exe.",
-            "One space per confirmed white target. No global 50 ms cooldown.",
+            "One space per confirmed target. No global 50 ms cooldown.",
+            "DXGI capture; white first, following gray sector as fallback.",
             "Close with the top-right X button.",
             "Observe mode: VDchecker.exe --observe.",
             "Log: %LOCALAPPDATA%\VDchecker\vdchecker.log."

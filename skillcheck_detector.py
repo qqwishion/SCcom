@@ -21,6 +21,13 @@ def difference(a: float, b: float) -> float:
 class Target:
     angle: float
     width: float
+    gray_angle: float | None = None
+    gray_width: float = 0.0
+
+    def gray_region(self) -> "Target | None":
+        if self.gray_angle is None or self.gray_width <= 0:
+            return None
+        return Target(self.gray_angle, self.gray_width)
 
     def overlap_half_width(self, pointer_width: float) -> float:
         margin = min(math.radians(0.3), self.width * 0.1)
@@ -146,6 +153,36 @@ class SkillcheckDetector:
         self.maps.clear()
         return best
 
+    def following_gray(
+        self, white: np.ndarray, circle: tuple, white_group: np.ndarray
+    ) -> tuple[float | None, float]:
+        band = self.polar(white, circle, 0.90, 1.10, 33)
+        # The gray sector has two bright radial rims and a dark interior.
+        outlined = (
+            (band[:10].max(axis=0) > 0.5)
+            & (band[23:].max(axis=0) > 0.5)
+            & (band[12:22].mean(axis=0) < 0.55)
+        )
+        start = (int(white_group[-1]) + 1) % len(self.angles)
+        support = [bool(outlined[(start + i) % len(self.angles)]) for i in range(180)]
+        # Close only short raster gaps; never infer a sector from an unbounded ring.
+        first = next((i for i in range(4) if support[i]), None)
+        if first is None:
+            return None, 0.0
+        last, gap = first, 0
+        for i in range(first, len(support)):
+            if support[i]:
+                last, gap = i, 0
+            else:
+                gap += 1
+                if gap >= 4:
+                    break
+        if last - first + 1 < 6 or last >= len(support) - 4:
+            return None, 0.0
+        indexes = (start + np.arange(first, last + 1)) % len(self.angles)
+        angle = math.atan2(float(self.sin[indexes].mean()), float(self.cos[indexes].mean())) % TAU
+        return angle, len(indexes) * TAU / len(self.angles)
+
     def detect(self, frame: np.ndarray) -> Observation | None:
         b, g, r = cv2.split(frame[:, :, :3])
         low = cv2.min(cv2.min(b, g), r)
@@ -175,7 +212,8 @@ class SkillcheckDetector:
         if candidates:
             group = max(candidates, key=lambda g: float(thick[g].sum()))
             angle = math.atan2(float(self.sin[group].mean()), float(self.cos[group].mean())) % TAU
-            target = Target(angle, len(group) * TAU / 720)
+            gray_angle, gray_width = self.following_gray(white, circle, group)
+            target = Target(angle, len(group) * TAU / 720, gray_angle, gray_width)
         radial = self.polar(red, circle, 0.52, 1.34, 45)
         strength = radial.mean(axis=0)
         # A narrow radial ridge distinguishes the needle from broad red flames.

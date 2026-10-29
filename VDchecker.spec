@@ -1,11 +1,15 @@
 # -*- mode: python ; coding: utf-8 -*-
+from PyInstaller.utils.hooks import collect_submodules
 
 a = Analysis(
     ["main.py"],
     pathex=[],
     binaries=[],
     datas=[("assets/space_template.png", "assets")],
-    hiddenimports=[],
+    hiddenimports=collect_submodules("dxcam") + [
+        "dxcam.core.duplicator",
+        "dxcam.processor._numpy_kernels",
+    ],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

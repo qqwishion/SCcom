@@ -1,4 +1,6 @@
 import ctypes
+import logging
+import re
 from ctypes import wintypes
 from dataclasses import dataclass
 
@@ -6,6 +8,8 @@ import mss
 import numpy as np
 
 from input_controller import user32
+
+log = logging.getLogger(__name__)
 
 user32.GetClientRect.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.RECT)]
 user32.ClientToScreen.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.POINT)]
@@ -37,8 +41,28 @@ class ScreenCapture:
         self.client: Region | None = None
         self.region: Region | None = None
         self.locked = False
+        self.camera = None
+        self.name = "MSS"
+        try:
+            import dxcam
+
+            primary = re.search(
+                r"Device\[(\d+)\] Output\[(\d+)\].*Primary:True", dxcam.output_info()
+            )
+            if primary is None:
+                raise RuntimeError("Cannot identify primary DXGI output")
+            self.camera = dxcam.create(
+                device_idx=int(primary[1]), output_idx=int(primary[2]), output_color="BGR"
+            )
+            self.name = "DXGI"
+            log.info("Capture backend: DXGI")
+        except Exception:
+            log.warning("DXGI unavailable; using MSS", exc_info=True)
 
     def close(self) -> None:
+        if self.camera is not None:
+            self.camera.release()
+            self.camera = None
         self.backend.close()
 
     def update_window(self, hwnd: int) -> bool:
@@ -76,7 +100,26 @@ class ScreenCapture:
         self.region = Region(left, top, right - left, bottom - top)
         self.locked = True
 
-    def grab(self) -> np.ndarray:
+    def grab(self) -> np.ndarray | None:
         if self.region is None:
             raise RuntimeError("Capture region is not set")
+        if self.camera is not None:
+            r = self.region
+            if (
+                0 <= r.left < r.left + r.width <= self.camera.width
+                and 0 <= r.top < r.top + r.height <= self.camera.height
+            ):
+                try:
+                    # DXGI returns None when no new desktop frame is available.
+                    # Polling must not turn that into a missing skillcheck.
+                    return self.camera.grab(
+                        region=(r.left, r.top, r.left + r.width, r.top + r.height)
+                    )
+                except Exception:
+                    log.warning("DXGI capture failed; using MSS", exc_info=True)
+            else:
+                log.info("Capture moved outside primary output; using MSS")
+            self.camera.release()
+            self.camera = None
+            self.name = "MSS"
         return np.asarray(self.backend.grab(self.region.as_dict()))[:, :, :3]

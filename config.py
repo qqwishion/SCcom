@@ -3,7 +3,7 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class Config:
-    capture_hz: int = 180
+    capture_hz: int = 240
     # Additional frame-age allowance used only to reject stale overlaps.
     input_lead_ms: float = 0.0
     key_hold_ms: float = 12.0

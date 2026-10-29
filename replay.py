@@ -19,7 +19,15 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Проверка видео без отправки клавиш")
     parser.add_argument("video", type=Path)
     parser.add_argument("--output", type=Path, default=Path("artifacts/replay.csv"))
+    parser.add_argument(
+        "--frame-step",
+        type=int,
+        default=1,
+        help="Analyze every Nth frame to simulate missed captures",
+    )
     args = parser.parse_args()
+    if args.frame_step < 1:
+        parser.error("--frame-step must be positive")
     cap = cv2.VideoCapture(str(args.video))
     if not cap.isOpened():
         parser.error(f"Cannot open {args.video}")
@@ -39,6 +47,9 @@ def main() -> None:
             if not ok:
                 break
             timestamp = frames / fps
+            if frames % args.frame_step:
+                frames += 1
+                continue
             h, w = frame.shape[:2]
             base = (
                 max(0, w // 2 - 320),
@@ -59,6 +70,7 @@ def main() -> None:
             speed = None
             fire = False
             scheduled_time: float | str = ""
+            hit_zone = ""
             if observation:
                 seen += 1
                 last_seen = timestamp
@@ -73,6 +85,7 @@ def main() -> None:
                 targets += int(decision.new_target)
                 fire = decision.fire
                 if fire:
+                    hit_zone = decision.zone
                     scheduled_time = timestamp
                     shots.append(
                         (
@@ -81,6 +94,7 @@ def main() -> None:
                                 observation,
                                 center=(left + observation.center[0], top + observation.center[1]),
                             ),
+                            hit_zone,
                         )
                     )
                     predictor.mark_fired()
@@ -114,6 +128,9 @@ def main() -> None:
                     speed or "",
                     fire,
                     scheduled_time,
+                    hit_zone,
+                    observation.target.gray_angle if observation and observation.target else "",
+                    observation.target.gray_width if observation and observation.target else "",
                 ]
             )
             frames += 1
@@ -132,6 +149,9 @@ def main() -> None:
                 "speed_rad_s",
                 "would_press",
                 "scheduled_time_s",
+                "hit_zone",
+                "gray_angle_rad",
+                "gray_width_rad",
             ]
         )
         writer.writerows(rows)
@@ -139,7 +159,7 @@ def main() -> None:
     if shots:
         sheet = np.zeros((((len(shots) + 3) // 4) * 250, 4 * 240, 3), dtype=np.uint8)
         cap = cv2.VideoCapture(str(args.video))
-        for i, (timestamp, observation) in enumerate(shots):
+        for i, (timestamp, observation, zone) in enumerate(shots):
             cap.set(cv2.CAP_PROP_POS_MSEC, timestamp * 1000)
             ok, frame = cap.read()
             if not ok:
@@ -152,7 +172,7 @@ def main() -> None:
             sheet[top : top + 220, left : left + 220] = crop
             cv2.putText(
                 sheet,
-                f"{timestamp:.3f}s",
+                f"{timestamp:.3f}s {zone}",
                 (left + 3, top + 240),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 0.5,
@@ -165,7 +185,7 @@ def main() -> None:
         f"Frames={frames}; circle_frames={seen}; target_events={targets}; simulated_presses={len(shots)}"
     )
     print(f"Detector+timing ms: median={np.median(costs):.2f}; p95={np.percentile(costs, 95):.2f}")
-    print("Simulated press times:", ", ".join(f"{t:.3f}" for t, _ in shots))
+    print("Simulated press times:", ", ".join(f"{t:.3f}({zone})" for t, _, zone in shots))
     print(f"Report: {args.output.resolve()}")
 
 

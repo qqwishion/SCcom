@@ -49,13 +49,21 @@ def main() -> None:
         format="%(asctime)s pid=%(process)d %(levelname)s %(message)s",
     )
     logging.info(
-        "Startup: per-target-v5 repeat_guard=per_target observe=%s",
+        "Startup: dxgi-gray-v6 repeat_guard=per_target observe=%s",
         args.observe,
     )
     if args.smoke_test:
+        from screen_capture import Region, ScreenCapture
         from skillcheck_detector import SkillcheckDetector
 
         SkillcheckDetector(CONFIG.min_radius, CONFIG.max_radius)
+        smoke_capture = ScreenCapture()
+        try:
+            smoke_capture.region = Region(0, 0, 64, 64)
+            smoke_capture.grab()
+            logging.info("Smoke capture backend=%s", smoke_capture.name)
+        finally:
+            smoke_capture.close()
     engine = Engine(replace(CONFIG, input_lead_ms=args.lead_ms, send_input=not args.observe))
     root = tk.Tk()
     root.title("VDchecker")

@@ -150,6 +150,56 @@ class TimingTests(unittest.TestCase):
         obs = Observation((100, 100), 68, Target(1, 0.10), 0.90, 0.06)
         self.assertFalse(p.update(obs, 9, 0.01).fire)
 
+    def test_white_has_priority_and_gray_does_not_repeat_a_successful_press(self):
+        p = TimingPredictor()
+        target = Target(1, 0.2, 1.4, 0.5)
+        p.update(Observation((100, 100), 68, target, 0.5), 8, 0)
+        result = p.update(Observation((100, 100), 68, target, 1), 8, 0)
+        self.assertTrue(result.fire)
+        self.assertEqual(result.zone, "white")
+        p.mark_fired()
+        self.assertFalse(p.update(Observation((100, 100), 68, target, 1.4), 8, 0).fire)
+
+    def test_gray_fallback_after_missed_white(self):
+        p = TimingPredictor()
+        target = Target(1, 0.10, 1.4, 0.45)
+        p.update(Observation((100, 100), 68, target, 0.7), 12, 0)
+        p.update(Observation((100, 100), 68, target, 0.8), 12, 0)
+        result = p.update(Observation((100, 100), 68, target, 1.30), 12, 0)
+        self.assertTrue(result.fire)
+        self.assertEqual(result.zone, "gray")
+
+    def test_gray_fallback_wraps_past_twelve_oclock(self):
+        p = TimingPredictor()
+        target = Target(6.1, 0.1, 0.2, 0.4)
+        p.update(Observation((100, 100), 68, target, 5.8), 12, 0)
+        p.update(Observation((100, 100), 68, target, 5.9), 12, 0)
+        result = p.update(Observation((100, 100), 68, target, 0.2), 12, 0)
+        self.assertTrue(result.fire)
+        self.assertEqual(result.zone, "gray")
+
+    def test_gray_before_white_is_never_a_fallback(self):
+        p = TimingPredictor()
+        target = Target(1, 0.1, 0.6, 0.4)
+        p.update(Observation((100, 100), 68, target, 0.4), 8, 0)
+        self.assertFalse(p.update(Observation((100, 100), 68, target, 0.6), 8, 0).fire)
+
+    def test_contained_white_fragment_does_not_rearm_or_block_crossing(self):
+        p = TimingPredictor()
+        target = Target(1, 0.20, 1.5, 0.6)
+        p.update(Observation((100, 100), 68, target, 0.6), 8, 0)
+        p.update(Observation((100, 100), 68, target, 0.7), 8, 0)
+        token = p.target_id
+        result = p.update(Observation((100, 100), 68, Target(1.06, 0.05), 1), 8, 0)
+        self.assertTrue(result.fire)
+        self.assertIs(p.target_id, token)
+        p.mark_fired()
+        for _ in range(3):
+            self.assertFalse(
+                p.update(Observation((100, 100), 68, Target(1.06, 0.05), 1), 8, 0).fire
+            )
+        self.assertIs(p.target_id, token)
+
 
 if __name__ == "__main__":
     unittest.main()
