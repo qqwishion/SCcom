@@ -58,10 +58,9 @@ def foreground_roblox() -> int | None:
 
 
 class InputController:
-    def __init__(self, hold_ms: float = 12, min_interval_ms: float = 50):
+    def __init__(self, hold_ms: float = 12):
         self.hold_s = hold_ms / 1000
-        self.min_interval_s = min_interval_ms / 1000
-        self.next_allowed_press = float("-inf")
+        self.last_target: object | None = None
 
     @staticmethod
     def send(up: bool) -> None:
@@ -69,16 +68,16 @@ class InputController:
         if user32.SendInput(1, ctypes.byref(event), ctypes.sizeof(INPUT)) != 1:
             raise OSError(ctypes.get_last_error(), "SendInput failed")
 
-    def tap_space(self, expected_hwnd: int) -> float | None:
-        # Global guard, independent of detector/target resets. Never queue a blocked tap.
-        if time.perf_counter() < self.next_allowed_press:
+    def tap_space(self, expected_hwnd: int, target_id: object) -> float | None:
+        # One keydown per confirmed target; a different target has no timed cooldown.
+        if target_id is None or target_id is self.last_target:
             return None
         if foreground_roblox() != expected_hwnd or user32.GetAsyncKeyState(0x20) & 0x8000:
             return None
         start = time.perf_counter()
         self.send(False)
         pressed_at = time.perf_counter()
-        self.next_allowed_press = pressed_at + self.min_interval_s
+        self.last_target = target_id
         down_ms = (pressed_at - start) * 1000
         try:
             time.sleep(self.hold_s)

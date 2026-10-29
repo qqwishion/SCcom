@@ -22,6 +22,7 @@ class TimingPredictor:
 
     def reset(self) -> None:
         self.target: Target | None = None
+        self.target_id: object | None = None
         self.candidate: Target | None = None
         self.candidate_count = 0
         self.fired = False
@@ -54,6 +55,7 @@ class TimingPredictor:
             if self.candidate_count < 2:
                 return Decision()
             self.target, self.fired, new = target, False, True
+            self.target_id = object()
             self.candidate = None
             self.candidate_count = 0
         else:

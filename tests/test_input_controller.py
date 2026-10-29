@@ -4,7 +4,7 @@ from unittest.mock import patch
 from input_controller import InputController
 
 
-class CooldownTests(unittest.TestCase):
+class TargetGuardTests(unittest.TestCase):
     def setUp(self):
         self.now = 10.0
         self.clock = patch("input_controller.time.perf_counter", side_effect=lambda: self.now)
@@ -16,30 +16,37 @@ class CooldownTests(unittest.TestCase):
             p.start()
             self.addCleanup(p.stop)
         self.controller = InputController()
+        self.target = object()
 
-    def test_blocks_repeat_before_50ms_and_allows_at_boundary(self):
-        self.assertIsNotNone(self.controller.tap_space(123))
-        self.now = 10.049
-        self.assertIsNone(self.controller.tap_space(123))
-        self.now = 10.050
-        self.assertIsNotNone(self.controller.tap_space(123))
+    def test_new_target_is_allowed_after_20ms(self):
+        self.assertIsNotNone(self.controller.tap_space(123, self.target))
+        self.now = 10.020
+        self.assertIsNotNone(self.controller.tap_space(123, object()))
         self.assertEqual(InputController.send.call_count, 4)  # two down/up pairs
 
-    def test_focus_change_does_not_clear_cooldown(self):
-        self.controller.tap_space(123)
+    def test_same_target_stays_blocked_after_50ms(self):
+        self.controller.tap_space(123, self.target)
+        for timestamp in (10.020, 10.050, 11.0):
+            self.now = timestamp
+            self.assertIsNone(self.controller.tap_space(123, self.target))
+        self.assertEqual(InputController.send.call_count, 2)
+
+    def test_focus_change_does_not_rearm_the_same_target(self):
+        self.controller.tap_space(123, self.target)
         self.focus.stop()
         with patch("input_controller.foreground_roblox", return_value=456):
             self.now = 10.020
-            self.assertIsNone(self.controller.tap_space(456))
+            self.assertIsNone(self.controller.tap_space(456, self.target))
             self.now = 10.051
-            self.assertIsNotNone(self.controller.tap_space(456))
+            self.assertIsNone(self.controller.tap_space(456, self.target))
+            self.assertIsNotNone(self.controller.tap_space(456, object()))
 
-    def test_failed_keydown_does_not_start_cooldown(self):
+    def test_failed_keydown_does_not_consume_target(self):
         InputController.send.side_effect = OSError("test failure")
         with self.assertRaises(OSError):
-            self.controller.tap_space(123)
+            self.controller.tap_space(123, self.target)
         InputController.send.side_effect = None
-        self.assertIsNotNone(self.controller.tap_space(123))
+        self.assertIsNotNone(self.controller.tap_space(123, self.target))
 
 
 if __name__ == "__main__":

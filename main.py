@@ -49,8 +49,7 @@ def main() -> None:
         format="%(asctime)s pid=%(process)d %(levelname)s %(message)s",
     )
     logging.info(
-        "Startup: visible-overlap-v4 cooldown_ms=%.1f observe=%s",
-        CONFIG.min_press_interval_ms,
+        "Startup: per-target-v5 repeat_guard=per_target observe=%s",
         args.observe,
     )
     if args.smoke_test:

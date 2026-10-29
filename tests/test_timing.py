@@ -24,6 +24,22 @@ class TimingTests(unittest.TestCase):
         self.assertTrue(result.new_target)
         self.assertTrue(result.fire)
 
+    def test_target_id_changes_only_for_a_confirmed_new_zone(self):
+        p = TimingPredictor()
+        p.update(observation(1, 1), 8, 0)
+        p.update(observation(1, 1), 8, 0)
+        first = p.target_id
+        self.assertIsNotNone(first)
+        p.mark_fired()
+        p.update(observation(3, 3), 8, 0)
+        self.assertIs(p.target_id, first)
+        p.update(observation(1, 1), 8, 0)
+        self.assertIs(p.target_id, first)
+        p.update(observation(3, 3), 8, 0)
+        result = p.update(observation(3, 3), 8, 0)
+        self.assertTrue(result.fire)
+        self.assertIsNot(p.target_id, first)
+
     def test_missing_target_does_not_rearm(self):
         p = TimingPredictor()
         p.update(observation(1, 1), 4, 0)

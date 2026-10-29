@@ -55,7 +55,8 @@ jobs:
           }
           @(
             "Windows x64. Python is included; run VDchecker.exe.",
-            "Close with the top-right X button. Minimum space interval: 50 ms.",
+            "One space per confirmed white target. No global 50 ms cooldown.",
+            "Close with the top-right X button.",
             "Observe mode: VDchecker.exe --observe.",
             "Log: %LOCALAPPDATA%\VDchecker\vdchecker.log."
           ) | Set-Content release-notes.txt -Encoding utf8

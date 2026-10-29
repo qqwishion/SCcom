@@ -47,7 +47,7 @@ class Engine:
         cv2.setNumThreads(1)
         detector = SkillcheckDetector(self.config.min_radius, self.config.max_radius)
         tracker, predictor = IndicatorTracker(), TimingPredictor()
-        keyboard = InputController(self.config.key_hold_ms, self.config.min_press_interval_ms)
+        keyboard = InputController(self.config.key_hold_ms)
         capture: ScreenCapture | None = None
         timer = ctypes.WinDLL("winmm")
         timer_active = timer.timeBeginPeriod(1) == 0
@@ -154,7 +154,7 @@ class Engine:
                                 predictor.mark_fired()
                                 log.info("Observe: would press space; speed=%.3f", speed)
                                 continue
-                            sent = keyboard.tap_space(hwnd)
+                            sent = keyboard.tap_space(hwnd, predictor.target_id)
                             if sent is not None:
                                 last_sent_time = actual
                                 predictor.mark_fired()
