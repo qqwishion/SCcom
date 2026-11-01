@@ -20,23 +20,14 @@ def main() -> None:
     )
     parser.add_argument("--smoke-test", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument(
-        "--moonwalk-ms",
-        type=float,
-        default=CONFIG.moonwalk_interval_ms,
-        help="Длительность зажатия A/D при удержании Caps Lock, мс (20–200; по умолчанию 53)",
-    )
-    parser.add_argument(
         "--observe", action="store_true", help="Только наблюдение, без отправки пробела"
     )
     args = parser.parse_args()
-    if not 20 <= args.moonwalk_ms <= 200:
-        parser.error("--moonwalk-ms должен быть от 20 до 200")
     if sys.platform != "win32":
         parser.error("Для захвата и отправки пробела требуется Windows")
     import tkinter as tk
 
     from engine import Engine
-    from moonwalk import Moonwalk
     from screen_capture import enable_dpi_awareness
 
     enable_dpi_awareness()
@@ -73,14 +64,7 @@ def main() -> None:
             logging.info("Smoke capture backend=%s", smoke_capture.name)
         finally:
             smoke_capture.close()
-    config = replace(
-        CONFIG,
-        input_lead_ms=args.lead_ms,
-        send_input=not args.observe,
-        moonwalk_interval_ms=args.moonwalk_ms,
-    )
-    engine = Engine(config)
-    moonwalk = Moonwalk(config)
+    engine = Engine(replace(CONFIG, input_lead_ms=args.lead_ms, send_input=not args.observe))
     root = tk.Tk()
     root.title("VDchecker")
     root.overrideredirect(True)
@@ -95,13 +79,12 @@ def main() -> None:
 
     def close() -> None:
         engine.stop()
-        moonwalk.stop()
         root.withdraw()
         crosshair.withdraw()
 
         # Key-up completes before the process is allowed to exit.
         def wait_worker() -> None:
-            if engine.thread.is_alive() or moonwalk.thread.is_alive():
+            if engine.thread.is_alive():
                 root.after(20, wait_worker)
             else:
                 root.destroy()
@@ -215,18 +198,14 @@ def main() -> None:
         root.after(500, close)
     else:
         engine.start()
-        moonwalk.start()
     refresh()
     check_hotkey()
     try:
         root.mainloop()
     finally:
         engine.stop()
-        moonwalk.stop()
         if engine.thread.ident is not None:
             engine.thread.join(timeout=2)
-        if moonwalk.thread.ident is not None:
-            moonwalk.thread.join(timeout=2)
 
 
 if __name__ == "__main__":

@@ -11,9 +11,6 @@ class Config:
     missing_reset_s: float = 0.18
     min_radius: int = 35
     max_radius: int = 130
-    moonwalk_interval_ms: float = 53.0
-    moonwalk_gap_ms: float = 10.0
-    moonwalk_hold_vk: int = 0x14  # Caps Lock (held state, not toggle state)
 
 
 CONFIG = Config()
