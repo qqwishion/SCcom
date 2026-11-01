@@ -11,7 +11,7 @@ log = logging.getLogger(__name__)
 
 
 class MoonwalkController:
-    def __init__(self, interval_ms: float = 80, gap_ms: float = 15):
+    def __init__(self, interval_ms: float = 53, gap_ms: float = 10):
         self.interval_s = interval_ms / 1000
         self.gap_s = gap_ms / 1000
         self.held_scan: int | None = None

@@ -19,7 +19,7 @@ class MoonwalkTests(unittest.TestCase):
         self.send.assert_not_called()
 
     def test_alternates_without_overlapping_keys(self):
-        for now in (1.0, 1.079, 1.081, 1.095, 1.097, 1.178, 1.194):
+        for now in (1.0, 1.052, 1.054, 1.063, 1.065, 1.119, 1.130):
             self.controller.update(True, 123, now)
         self.assertEqual(
             self.send.call_args_list,
@@ -66,15 +66,15 @@ class MoonwalkTests(unittest.TestCase):
         self.controller.update(True, 123, 1)
         self.controller.update(True, 123, 2)
         self.assertEqual(self.send.call_count, 2)
-        self.controller.update(True, 123, 2.014)
+        self.controller.update(True, 123, 2.009)
         self.assertEqual(self.send.call_count, 2)
-        self.controller.update(True, 123, 2.016)
+        self.controller.update(True, 123, 2.011)
         self.assertEqual(self.send.call_count, 3)
 
     def test_release_during_gap_cancels_next_key(self):
         self.controller.update(True, 123, 1)
-        self.controller.update(True, 123, 1.081)
-        self.controller.update(False, 123, 1.09)
+        self.controller.update(True, 123, 1.054)
+        self.controller.update(False, 123, 1.059)
         self.controller.update(False, 123, 2)
         self.assertEqual(self.send.call_args_list, [call(0x1E, False), call(0x1E, True)])
 
@@ -100,8 +100,18 @@ class MoonwalkTests(unittest.TestCase):
             worker.start()
             worker.thread.join(timeout=1)
         self.assertFalse(worker.thread.is_alive())
-        keys.assert_called_once_with(0xC0)
+        keys.assert_called_once_with(0x14)
         self.assertEqual(self.send.call_args_list, [call(0x1E, False), call(0x1E, True)])
+
+    def test_caps_toggle_bit_alone_does_not_activate(self):
+        worker = Moonwalk(Config())
+        with patch("moonwalk.user32.GetAsyncKeyState", return_value=1) as keys:
+            with patch("moonwalk.time.perf_counter", side_effect=lambda: (worker.stop(), 1.0)[-1]):
+                worker.start()
+                worker.thread.join(timeout=1)
+        self.assertFalse(worker.thread.is_alive())
+        keys.assert_called_once_with(0x14)
+        self.send.assert_not_called()
 
     def test_observe_mode_never_sends_movement(self):
         worker = Moonwalk(Config(send_input=False))
