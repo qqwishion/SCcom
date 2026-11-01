@@ -57,6 +57,12 @@ def foreground_roblox() -> int | None:
     return hwnd if text.value.strip().lower() == "roblox" else None
 
 
+def send_scan(scan: int, up: bool) -> None:
+    event = INPUT(type=1, ki=KEYBDINPUT(0, scan, 0x0008 | (0x0002 if up else 0), 0, 0))
+    if user32.SendInput(1, ctypes.byref(event), ctypes.sizeof(INPUT)) != 1:
+        raise OSError(ctypes.get_last_error(), "SendInput failed")
+
+
 class InputController:
     def __init__(self, hold_ms: float = 12):
         self.hold_s = hold_ms / 1000
@@ -64,9 +70,7 @@ class InputController:
 
     @staticmethod
     def send(up: bool) -> None:
-        event = INPUT(type=1, ki=KEYBDINPUT(0, 0x39, 0x0008 | (0x0002 if up else 0), 0, 0))
-        if user32.SendInput(1, ctypes.byref(event), ctypes.sizeof(INPUT)) != 1:
-            raise OSError(ctypes.get_last_error(), "SendInput failed")
+        send_scan(0x39, up)
 
     def tap_space(self, expected_hwnd: int, target_id: object) -> float | None:
         # One keydown per confirmed target; a different target has no timed cooldown.
