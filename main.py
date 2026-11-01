@@ -114,6 +114,27 @@ def main() -> None:
     hwnd = u.GetParent(root.winfo_id())
     style = u.GetWindowLongW(hwnd, -20)
     u.SetWindowLongW(hwnd, -20, style | 0x08000000 | 0x00000080)
+    u.GetAsyncKeyState.argtypes = [ctypes.c_int]
+    u.GetAsyncKeyState.restype = ctypes.c_short
+    ui_visible = True
+    f10_down = bool(u.GetAsyncKeyState(0x79) & 0x8000)
+
+    def toggle_ui() -> None:
+        nonlocal ui_visible
+        ui_visible = not ui_visible
+        if ui_visible:
+            root.deiconify()
+        else:
+            root.withdraw()
+        logging.info("UI visible=%s", ui_visible)
+
+    def check_hotkey() -> None:
+        nonlocal f10_down
+        pressed = bool(u.GetAsyncKeyState(0x79) & 0x8000)
+        if pressed and not f10_down:
+            toggle_ui()
+        f10_down = pressed
+        root.after(20, check_hotkey)
 
     def refresh() -> None:
         s = engine.snapshot()
@@ -122,10 +143,22 @@ def main() -> None:
         root.after(250, refresh)
 
     if args.smoke_test:
+
+        def smoke_toggle() -> None:
+            toggle_ui()
+            root.update_idletasks()
+            assert root.state() == "withdrawn"
+            toggle_ui()
+            root.update_idletasks()
+            assert root.state() == "normal"
+            logging.info("Smoke UI hide/show passed")
+
+        root.after(100, smoke_toggle)
         root.after(500, close)
     else:
         engine.start()
     refresh()
+    check_hotkey()
     try:
         root.mainloop()
     finally:
