@@ -80,6 +80,7 @@ def main() -> None:
     def close() -> None:
         engine.stop()
         root.withdraw()
+        crosshair.withdraw()
 
         # Key-up completes before the process is allowed to exit.
         def wait_worker() -> None:
@@ -116,8 +117,36 @@ def main() -> None:
     u.SetWindowLongW(hwnd, -20, style | 0x08000000 | 0x00000080)
     u.GetAsyncKeyState.argtypes = [ctypes.c_int]
     u.GetAsyncKeyState.restype = ctypes.c_short
+    crosshair = tk.Toplevel(root)
+    crosshair.withdraw()
+    crosshair.overrideredirect(True)
+    crosshair.attributes("-topmost", True)
+    crosshair.attributes("-transparentcolor", "#ff00ff")
+    crosshair.configure(bg="#ff00ff")
+    crosshair.geometry(
+        f"10x10+{root.winfo_screenwidth() // 2 - 5}+{root.winfo_screenheight() // 2 - 5}"
+    )
+    canvas = tk.Canvas(crosshair, width=10, height=10, bg="#ff00ff", highlightthickness=0, bd=0)
+    canvas.pack()
+    canvas.create_oval(3, 3, 7, 7, fill="white", outline="white")
+    crosshair.update_idletasks()
+    crosshair_hwnd = u.GetParent(crosshair.winfo_id())
+    crosshair_style = u.GetWindowLongW(crosshair_hwnd, -20)
+    # Layered, click-through, non-activating tool window.
+    u.SetWindowLongW(crosshair_hwnd, -20, crosshair_style | 0x00080000 | 0x00000020 | 0x08000080)
+    crosshair_visible = False
     ui_visible = True
     f10_down = bool(u.GetAsyncKeyState(0x79) & 0x8000)
+    f8_down = bool(u.GetAsyncKeyState(0x77) & 0x8000)
+
+    def toggle_crosshair() -> None:
+        nonlocal crosshair_visible
+        crosshair_visible = not crosshair_visible
+        if crosshair_visible:
+            crosshair.deiconify()
+        else:
+            crosshair.withdraw()
+        logging.info("Crosshair visible=%s", crosshair_visible)
 
     def toggle_ui() -> None:
         nonlocal ui_visible
@@ -129,11 +158,15 @@ def main() -> None:
         logging.info("UI visible=%s", ui_visible)
 
     def check_hotkey() -> None:
-        nonlocal f10_down
+        nonlocal f10_down, f8_down
         pressed = bool(u.GetAsyncKeyState(0x79) & 0x8000)
         if pressed and not f10_down:
             toggle_ui()
         f10_down = pressed
+        pressed = bool(u.GetAsyncKeyState(0x77) & 0x8000)
+        if pressed and not f8_down:
+            toggle_crosshair()
+        f8_down = pressed
         root.after(20, check_hotkey)
 
     def refresh() -> None:
@@ -145,12 +178,20 @@ def main() -> None:
     if args.smoke_test:
 
         def smoke_toggle() -> None:
+            assert crosshair.state() == "withdrawn"
+            toggle_crosshair()
+            root.update_idletasks()
+            assert crosshair.state() == "normal"
             toggle_ui()
             root.update_idletasks()
             assert root.state() == "withdrawn"
+            assert crosshair.winfo_ismapped()
             toggle_ui()
             root.update_idletasks()
             assert root.state() == "normal"
+            toggle_crosshair()
+            assert crosshair.state() == "withdrawn"
+            logging.info("Smoke crosshair toggle passed")
             logging.info("Smoke UI hide/show passed")
 
         root.after(100, smoke_toggle)

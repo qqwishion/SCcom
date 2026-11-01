@@ -58,6 +58,7 @@ jobs:
             "One space per confirmed target. No global 50 ms cooldown.",
             "DXGI capture; white first, following gray sector as fallback.",
             "F10 hides/shows the overlay while automation keeps running.",
+            "F8 toggles a white center dot, disabled at startup.",
             "Close with the top-right X button.",
             "Observe mode: VDchecker.exe --observe.",
             "Log: %LOCALAPPDATA%\VDchecker\vdchecker.log."
