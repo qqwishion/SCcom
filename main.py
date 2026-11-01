@@ -23,7 +23,7 @@ def main() -> None:
         "--moonwalk-ms",
         type=float,
         default=CONFIG.moonwalk_interval_ms,
-        help="Интервал чередования A/D при удержании F6, мс (20–200; по умолчанию 35)",
+        help="Длительность зажатия A/D при удержании ~ / Ё, мс (20–200; по умолчанию 80)",
     )
     parser.add_argument(
         "--observe", action="store_true", help="Только наблюдение, без отправки пробела"

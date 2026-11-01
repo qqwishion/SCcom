@@ -11,8 +11,9 @@ class Config:
     missing_reset_s: float = 0.18
     min_radius: int = 35
     max_radius: int = 130
-    moonwalk_interval_ms: float = 35.0
-    moonwalk_hold_vk: int = 0x75  # F6
+    moonwalk_interval_ms: float = 80.0
+    moonwalk_gap_ms: float = 15.0
+    moonwalk_hold_vk: int = 0xC0  # ` / ~ / Ё (VK_OEM_3), no Shift required
 
 
 CONFIG = Config()

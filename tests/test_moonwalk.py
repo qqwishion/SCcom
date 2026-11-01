@@ -11,7 +11,7 @@ class MoonwalkTests(unittest.TestCase):
         self.send = patch("moonwalk.send_scan").start()
         self.focus = patch("moonwalk.foreground_roblox", return_value=123).start()
         self.addCleanup(patch.stopall)
-        self.controller = MoonwalkController(35)
+        self.controller = MoonwalkController()
 
     def test_inactive_does_not_send(self):
         self.controller.update(False, 123, 1)
@@ -19,7 +19,7 @@ class MoonwalkTests(unittest.TestCase):
         self.send.assert_not_called()
 
     def test_alternates_without_overlapping_keys(self):
-        for now in (1.0, 1.01, 1.036, 1.072):
+        for now in (1.0, 1.079, 1.081, 1.095, 1.097, 1.178, 1.194):
             self.controller.update(True, 123, now)
         self.assertEqual(
             self.send.call_args_list,
@@ -65,7 +65,18 @@ class MoonwalkTests(unittest.TestCase):
     def test_delayed_tick_does_not_replay_missed_pulses(self):
         self.controller.update(True, 123, 1)
         self.controller.update(True, 123, 2)
+        self.assertEqual(self.send.call_count, 2)
+        self.controller.update(True, 123, 2.014)
+        self.assertEqual(self.send.call_count, 2)
+        self.controller.update(True, 123, 2.016)
         self.assertEqual(self.send.call_count, 3)
+
+    def test_release_during_gap_cancels_next_key(self):
+        self.controller.update(True, 123, 1)
+        self.controller.update(True, 123, 1.081)
+        self.controller.update(False, 123, 1.09)
+        self.controller.update(False, 123, 2)
+        self.assertEqual(self.send.call_args_list, [call(0x1E, False), call(0x1E, True)])
 
     def test_failed_release_retains_ownership_for_retry(self):
         self.controller.update(True, 123, 1)
@@ -79,7 +90,7 @@ class MoonwalkTests(unittest.TestCase):
 
     def test_worker_shutdown_releases_held_key(self):
         worker = Moonwalk(Config())
-        with patch("moonwalk.user32.GetAsyncKeyState", return_value=0x8000):
+        with patch("moonwalk.user32.GetAsyncKeyState", return_value=0x8000) as keys:
 
             def send(scan, up):
                 if not up:
@@ -89,6 +100,7 @@ class MoonwalkTests(unittest.TestCase):
             worker.start()
             worker.thread.join(timeout=1)
         self.assertFalse(worker.thread.is_alive())
+        keys.assert_called_once_with(0xC0)
         self.assertEqual(self.send.call_args_list, [call(0x1E, False), call(0x1E, True)])
 
     def test_observe_mode_never_sends_movement(self):

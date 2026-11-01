@@ -11,8 +11,9 @@ log = logging.getLogger(__name__)
 
 
 class MoonwalkController:
-    def __init__(self, interval_ms: float = 35):
+    def __init__(self, interval_ms: float = 80, gap_ms: float = 15):
         self.interval_s = interval_ms / 1000
+        self.gap_s = gap_ms / 1000
         self.held_scan: int | None = None
         self.hwnd: int | None = None
         self.next_change = 0.0
@@ -38,6 +39,8 @@ class MoonwalkController:
         if self.held_scan is not None:
             send_scan(self.held_scan, True)
             self.held_scan = None
+            self.next_change = now + self.gap_s
+            return
         # Recheck focus immediately before keydown.
         if foreground_roblox() != hwnd:
             self.release()
@@ -63,7 +66,9 @@ class Moonwalk:
         self.stop_event.set()
 
     def run(self) -> None:
-        controller = MoonwalkController(self.config.moonwalk_interval_ms)
+        controller = MoonwalkController(
+            self.config.moonwalk_interval_ms, self.config.moonwalk_gap_ms
+        )
         try:
             while not self.stop_event.is_set():
                 try:
